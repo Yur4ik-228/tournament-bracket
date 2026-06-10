@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BRAWL ARENA — Турнірна сітка</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#070016;
+    --purple:#7c2bf0;
+    --purple-deep:#3a0d6e;
+    --yellow:#ffe000;
+    --blue:#22e6ff;
+    --pink:#ff2bd6;
+    --glass:rgba(124,43,240,.10);
+    --glass-border:rgba(124,43,240,.45);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    font-family:'Rajdhani',sans-serif;
+    color:#e9e2ff;
+    background:var(--bg);
+    overflow-x:hidden;
+    min-height:100vh;
+  }
+  /* animated background */
+  body::before{
+    content:"";position:fixed;inset:-20%;z-index:-2;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(124,43,240,.35), transparent 45%),
+      radial-gradient(circle at 85% 15%, rgba(34,230,255,.25), transparent 45%),
+      radial-gradient(circle at 50% 90%, rgba(255,224,0,.18), transparent 50%),
+      radial-gradient(circle at 80% 80%, rgba(255,43,214,.20), transparent 45%);
+    filter:blur(10px);
+    animation:floatbg 16s ease-in-out infinite alternate;
+  }
+  body::after{
+    content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background-image:linear-gradient(rgba(124,43,240,.06) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(124,43,240,.06) 1px,transparent 1px);
+    background-size:46px 46px;
+    mask-image:radial-gradient(circle at 50% 40%,#000 30%,transparent 85%);
+  }
+  @keyframes floatbg{0%{transform:translate(0,0) scale(1)}100%{transform:translate(-3%,2%) scale(1.08)}}
+
+  .display{font-family:'Orbitron',sans-serif}
+  .glass{
+    background:linear-gradient(160deg,rgba(124,43,240,.14),rgba(10,2,30,.55));
+    backdrop-filter:blur(16px) saturate(140%);
+    -webkit-backdrop-filter:blur(16px) saturate(140%);
+    border:1px solid var(--glass-border);
+    border-radius:20px;
+    box-shadow:0 8px 40px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.08);
+  }
+  .neon-text{
+    color:#fff;
+    text-shadow:0 0 8px var(--blue),0 0 22px rgba(34,230,255,.6);
+  }
+  .neon-yellow{color:var(--yellow);text-shadow:0 0 10px rgba(255,224,0,.7),0 0 28px rgba(255,224,0,.4)}
+  .neon-purple{color:#c79bff;text-shadow:0 0 12px rgba(124,43,240,.8)}
+
+  .btn{
+    font-family:'Orbitron',sans-serif;font-weight:700;letter-spacing:.06em;
+    border-radius:14px;cursor:pointer;border:none;
+    padding:.85rem 1.4rem;color:#0a0118;position:relative;overflow:hidden;
+    transition:transform .18s ease, box-shadow .25s ease, filter .2s ease;
+    text-transform:uppercase;font-size:.9rem;
+  }
+  .btn:hover{transform:translateY(-2px) scale(1.02)}
+  .btn:active{transform:translateY(0) scale(.98)}
+  .btn-primary{background:linear-gradient(135deg,var(--yellow),#ffae00);box-shadow:0 0 20px rgba(255,224,0,.55)}
+  .btn-primary:hover{box-shadow:0 0 34px rgba(255,224,0,.85)}
+  .btn-blue{background:linear-gradient(135deg,var(--blue),#0a93ff);color:#021018;box-shadow:0 0 20px rgba(34,230,255,.5)}
+  .btn-blue:hover{box-shadow:0 0 34px rgba(34,230,255,.85)}
+  .btn-purple{background:linear-gradient(135deg,#a855f7,var(--purple));color:#fff;box-shadow:0 0 20px rgba(124,43,240,.55)}
+  .btn-purple:hover{box-shadow:0 0 34px rgba(124,43,240,.9)}
+  .btn-ghost{background:transparent;border:1px solid var(--glass-border);color:#cbb8ff;box-shadow:none}
+  .btn-ghost:hover{background:rgba(124,43,240,.18);box-shadow:0 0 18px rgba(124,43,240,.4)}
+  .btn-danger{background:transparent;border:1px solid rgba(255,80,120,.6);color:#ff7799;box-shadow:none}
+  .btn-danger:hover{background:rgba(255,40,90,.18);box-shadow:0 0 18px rgba(255,40,90,.45)}
+  .btn:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(.4);transform:none;box-shadow:none}
+
+  .tab{font-family:'Orbitron',sans-serif;font-weight:700;letter-spacing:.05em;font-size:.85rem;
+    padding:.6rem 1.3rem;border-radius:12px;cursor:pointer;color:#9a86c9;transition:.2s;text-transform:uppercase}
+  .tab.active{color:#fff;background:rgba(124,43,240,.25);box-shadow:0 0 18px rgba(124,43,240,.5);text-shadow:0 0 10px var(--blue)}
+  .tab:hover:not(.active){color:#d7c9ff}
+
+  textarea{font-family:'Rajdhani';}
+  ::-webkit-scrollbar{height:10px;width:10px}
+  ::-webkit-scrollbar-thumb{background:rgba(124,43,240,.5);border-radius:10px}
+  ::-webkit-scrollbar-track{background:rgba(255,255,255,.04)}
+
+  /* team chips */
+  .chip{
+    background:rgba(34,230,255,.08);border:1px solid rgba(34,230,255,.3);
+    border-radius:10px;padding:.4rem .7rem;font-weight:600;
+    transition:.2s;display:flex;align-items:center;gap:.4rem;
+  }
+  .chip:hover{transform:translateY(-2px) scale(1.03);box-shadow:0 0 16px rgba(34,230,255,.4);border-color:var(--blue)}
+
+  /* VS cards */
+  .vs-card{
+    cursor:pointer;border-radius:26px;padding:2.6rem 1.6rem;text-align:center;position:relative;
+    min-height:260px;display:flex;align-items:center;justify-content:center;
+    transition:transform .25s ease, box-shadow .3s ease, border-color .3s;
+    border:2px solid var(--glass-border);overflow:hidden;
+    background:linear-gradient(160deg,rgba(124,43,240,.18),rgba(10,2,30,.6));
+    backdrop-filter:blur(14px);
+  }
+  .vs-card .label{position:relative;z-index:2;width:100%}
+  /* team name auto-scales to fit but never overflows */
+  .team-name{font-size:clamp(1.2rem,2.8vw,2.4rem)}
+  @media(min-width:768px){.vs-card{min-height:300px}}
+  .vs-card::after{content:"";position:absolute;inset:0;opacity:0;transition:opacity .3s;
+    background:radial-gradient(circle at 50% 0%,rgba(255,224,0,.25),transparent 60%)}
+  .vs-card:hover{transform:translateY(-8px) scale(1.04);border-color:var(--yellow);
+    box-shadow:0 0 40px rgba(255,224,0,.5)}
+  .vs-card:hover::after{opacity:1}
+  .vs-card.left{border-color:rgba(34,230,255,.5)}
+  .vs-card.left:hover{box-shadow:0 0 40px rgba(34,230,255,.6);border-color:var(--blue)}
+  .vs-card.right{border-color:rgba(255,43,214,.5)}
+  .vs-card.right:hover{box-shadow:0 0 40px rgba(255,43,214,.6);border-color:var(--pink)}
+  .vs-card.winner{border-color:var(--yellow);box-shadow:0 0 60px rgba(255,224,0,.8);animation:winpulse 1.2s ease infinite}
+  .vs-card.loser{opacity:.35;filter:grayscale(.7) blur(.5px);transform:scale(.94)}
+  @keyframes winpulse{0%,100%{box-shadow:0 0 40px rgba(255,224,0,.6)}50%{box-shadow:0 0 75px rgba(255,224,0,1)}}
+
+  .vs-badge{
+    font-family:'Orbitron';font-weight:900;font-size:2.6rem;
+    background:linear-gradient(135deg,var(--yellow),var(--pink));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 0 18px rgba(255,43,214,.7));
+    animation:vsthrob 1.6s ease infinite;
+  }
+  @keyframes vsthrob{0%,100%{transform:scale(1) rotate(-3deg)}50%{transform:scale(1.15) rotate(3deg)}}
+
+  /* reels / shuffle overlay */
+  .reel{height:90px;overflow:hidden;border-radius:14px;border:1px solid var(--glass-border);
+    display:flex;align-items:center;justify-content:center;font-family:'Orbitron';font-weight:700;
+    font-size:1.4rem;background:rgba(10,2,30,.7)}
+  .reel.spin{animation:reelglow .25s linear infinite}
+  @keyframes reelglow{0%{box-shadow:0 0 10px rgba(34,230,255,.4)}50%{box-shadow:0 0 30px rgba(255,43,214,.7)}100%{box-shadow:0 0 10px rgba(255,224,0,.5)}}
+  .reel .item{animation:flick .08s linear}
+  @keyframes flick{from{opacity:.2;transform:translateY(12px)}to{opacity:1;transform:none}}
+
+  .fade-in{animation:fadein .5s ease both}
+  @keyframes fadein{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  .pop-in{animation:popin .45s cubic-bezier(.2,1.4,.4,1) both}
+  @keyframes popin{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:scale(1)}}
+
+  /* bracket — two-sided, converging to centre */
+  .bracket-wrap{display:flex;align-items:stretch;justify-content:center;gap:.9rem;
+    overflow-x:auto;padding:1rem .2rem 1.6rem}
+  .bracket-side{display:flex;gap:.9rem}
+  .round-col{min-width:150px;display:flex;flex-direction:column;justify-content:center;gap:.8rem;flex:0 0 auto}
+  .center-col{min-width:190px;display:flex;flex-direction:column;justify-content:center;gap:1.2rem;flex:0 0 auto}
+  .round-head{font-family:'Orbitron';font-weight:700;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;
+    text-align:center;color:#cbb8ff;padding-bottom:.35rem;border-bottom:1px solid var(--glass-border);margin-bottom:.2rem}
+  .match-box{border:1px solid var(--glass-border);border-radius:11px;overflow:hidden;
+    background:rgba(10,2,30,.5);backdrop-filter:blur(8px);transition:.25s}
+  .match-box:hover{transform:scale(1.04);box-shadow:0 0 22px rgba(124,43,240,.5);z-index:2}
+  .slot{padding:.4rem .6rem;font-weight:600;display:flex;justify-content:space-between;align-items:center;
+    border-bottom:1px solid rgba(124,43,240,.25);font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .slot:last-child{border-bottom:none}
+  .slot.win{color:var(--yellow);text-shadow:0 0 10px rgba(255,224,0,.6);background:rgba(255,224,0,.07)}
+  .slot.win::after{content:"🏆";margin-left:6px}
+  .slot.lose{color:#7a6ca0;text-decoration:line-through;opacity:.65}
+  .slot.tbd{color:#6a5b94;font-style:italic}
+  /* centre final box — bigger, glowing */
+  .final-box{border:2px solid var(--yellow);box-shadow:0 0 28px rgba(255,224,0,.4);
+    background:linear-gradient(160deg,rgba(255,224,0,.10),rgba(10,2,30,.7))}
+  .final-box .slot{font-size:.95rem;font-weight:700;padding:.6rem .7rem}
+  .center-crown{text-align:center;font-size:2rem;filter:drop-shadow(0 0 14px rgba(255,224,0,.8));animation:champ 2s ease infinite}
+  .third-box{border:1px solid rgba(255,140,0,.6);box-shadow:0 0 18px rgba(255,140,0,.25)}
+  .center-label{font-family:'Orbitron';font-weight:700;font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;
+    text-align:center;color:#cbb8ff;margin-bottom:.15rem}
+
+  .champion-banner{animation:champ 2s ease infinite}
+  @keyframes champ{0%,100%{filter:drop-shadow(0 0 20px rgba(255,224,0,.7))}50%{filter:drop-shadow(0 0 50px rgba(255,224,0,1))}}
+
+  .hidden{display:none !important}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:60;
+    padding:.8rem 1.4rem;border-radius:14px;font-weight:700;font-family:'Orbitron';font-size:.85rem;
+    background:linear-gradient(135deg,var(--purple),#0a93ff);color:#fff;box-shadow:0 0 30px rgba(124,43,240,.6);
+    opacity:0;pointer-events:none;transition:.3s}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px)}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="text-center pt-8 pb-4 px-4">
+  <h1 class="display text-3xl md:text-5xl font-black tracking-widest">
+    <span class="neon-purple">BRAWL</span> <span class="neon-yellow">ARENA</span>
+  </h1>
+  <p class="neon-text tracking-[0.35em] text-xs md:text-sm mt-1 display">CYBER TOURNAMENT CONTROL</p>
+  <!-- TABS -->
+  <nav class="glass inline-flex gap-2 p-2 mt-5 rounded-2xl">
+    <button class="tab active" data-tab="setup">⚙ Налаштування</button>
+    <button class="tab" data-tab="arena">⚔ Арена</button>
+    <button class="tab" data-tab="bracket">🏆 Турнірна сітка</button>
+  </nav>
+</header>
+
+<main class="max-w-7xl mx-auto px-4 pb-24">
+
+  <!-- ============ SETUP TAB ============ -->
+  <section id="tab-setup" class="space-y-6">
+    <div class="glass p-6 fade-in">
+      <h2 class="display text-xl neon-text mb-2">1 · Завантаження команд</h2>
+      <p class="text-sm text-purple-200/70 mb-4">Завантажте <span class="neon-yellow">Excel (.xlsx)</span> напряму, або вставте дані з Excel / CSV / тексту. Система знайде стовпець <span class="neon-yellow">«Назва команди»</span>, прибере дублікати та порахує учасників.</p>
+      <textarea id="dataInput" rows="8" placeholder="Назва команди&#10;Phoenix Squad&#10;Neon Wolves&#10;Cyber Kings&#10;..."
+        class="w-full bg-black/40 border border-purple-500/40 rounded-xl p-3 text-purple-100 focus:outline-none focus:border-cyan-400 focus:shadow-[0_0_20px_rgba(34,230,255,.4)] transition"></textarea>
+      <div class="flex flex-wrap gap-3 mt-4 items-center">
+        <button id="parseBtn" class="btn btn-blue">🔍 Аналізувати дані</button>
+        <label class="btn btn-primary cursor-pointer">📊 Завантажити Excel/CSV
+          <input id="fileInput" type="file" accept=".xlsx,.xls,.csv,.txt,.tsv" class="hidden">
+        </label>
+        <button id="loadDemo" class="btn btn-ghost">🎲 Демо (16 команд)</button>
+      </div>
+    </div>
+
+    <div class="glass p-6 fade-in">
+      <div class="flex items-center justify-between flex-wrap gap-3 mb-4">
+        <h2 class="display text-xl neon-text">2 · Пул команд <span id="teamCount" class="neon-yellow">(0)</span></h2>
+        <div class="flex gap-3 flex-wrap">
+          <button id="startBtn" class="btn btn-primary" disabled>🚀 Старт турніру</button>
+        </div>
+      </div>
+      <div id="teamList" class="flex flex-wrap gap-2 min-h-[40px]">
+        <span class="text-purple-300/50 italic">Команди з'являться тут після аналізу...</span>
+      </div>
+    </div>
+
+    <div class="glass p-6 fade-in">
+      <h2 class="display text-xl neon-text mb-3">3 · Керування</h2>
+      <div class="flex gap-3 flex-wrap">
+        <button id="exportBtn" class="btn btn-purple">💾 Експорт прогресу</button>
+        <label class="btn btn-ghost cursor-pointer">📥 Імпорт прогресу
+          <input id="importInput" type="file" accept=".json" class="hidden">
+        </label>
+        <button id="resetBtn" class="btn btn-danger">♻ Скинути турнір</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ARENA TAB ============ -->
+  <section id="tab-arena" class="hidden space-y-6">
+    <!-- round status -->
+    <div class="glass p-5 flex items-center justify-between flex-wrap gap-4 fade-in">
+      <div>
+        <div class="text-xs tracking-[0.3em] text-cyan-300/70 display">ПОТОЧНИЙ РАУНД</div>
+        <div id="roundName" class="display text-2xl md:text-3xl neon-yellow font-black">—</div>
+      </div>
+      <div class="text-right text-sm">
+        <div>У пулі раунду: <span id="poolLeft" class="neon-text font-bold">0</span></div>
+        <div>Пройшли далі: <span id="advCount" class="neon-purple font-bold">0</span></div>
+      </div>
+    </div>
+
+    <!-- draw / controls -->
+    <div class="text-center fade-in">
+      <button id="drawBtn" class="btn btn-primary text-lg px-8 py-4">🎰 Випадковий вибір матчу</button>
+      <button id="nextRoundBtn" class="btn btn-blue text-lg px-8 py-4 hidden">➡ Наступний раунд</button>
+    </div>
+
+    <!-- shuffle overlay -->
+    <div id="shuffleBox" class="glass p-6 hidden">
+      <div class="text-center display neon-text tracking-[0.3em] mb-4 text-sm">ЖЕРЕБКУВАННЯ...</div>
+      <div class="grid grid-cols-2 gap-6 max-w-3xl mx-auto">
+        <div id="reelA" class="reel spin">—</div>
+        <div id="reelB" class="reel spin">—</div>
+      </div>
+    </div>
+
+    <!-- VERSUS -->
+    <div id="versusBox" class="hidden fade-in">
+      <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-4 md:gap-8 max-w-6xl mx-auto">
+        <div id="cardA" class="vs-card left">
+          <div class="label">
+            <div class="team-label text-sm tracking-[0.25em] text-cyan-300/70 display mb-4">TEAM A</div>
+            <div class="team-name display font-black break-words leading-none">—</div>
+            <div class="win-tag hidden display neon-yellow text-base mt-4 tracking-widest">🏆 ПЕРЕМОЖЕЦЬ</div>
+          </div>
+        </div>
+        <div class="vs-badge text-center">VS</div>
+        <div id="cardB" class="vs-card right">
+          <div class="label">
+            <div class="team-label text-sm tracking-[0.25em] text-pink-300/70 display mb-4">TEAM B</div>
+            <div class="team-name display font-black break-words leading-none">—</div>
+            <div class="win-tag hidden display neon-yellow text-base mt-4 tracking-widest">🏆 ПЕРЕМОЖЕЦЬ</div>
+          </div>
+        </div>
+      </div>
+      <div id="matchTag" class="text-center mt-5 display tracking-widest text-sm neon-purple"></div>
+    </div>
+
+    <!-- champion -->
+    <div id="championBox" class="hidden text-center py-10 fade-in">
+      <div class="champion-banner inline-block">
+        <div class="text-6xl mb-4">👑</div>
+        <div class="display tracking-[0.3em] text-cyan-300 text-sm mb-2">ЧЕМПІОН ТУРНІРУ</div>
+        <div id="championName" class="display text-4xl md:text-6xl font-black neon-yellow">—</div>
+      </div>
+      <div id="podium" class="flex justify-center gap-6 mt-10 flex-wrap"></div>
+    </div>
+
+    <div id="arenaEmpty" class="glass p-10 text-center text-purple-200/60 fade-in">
+      <p class="text-lg">Турнір ще не запущено.</p>
+      <p class="text-sm mt-2">Перейдіть у вкладку «Налаштування», завантажте команди та натисніть «Старт турніру».</p>
+    </div>
+  </section>
+
+  <!-- ============ BRACKET TAB ============ -->
+  <section id="tab-bracket" class="hidden fade-in">
+    <div class="glass p-6">
+      <h2 class="display text-xl neon-text mb-4">Турнірна сітка — шлях до чемпіонства</h2>
+      <div id="bracketWrap" class="bracket-wrap">
+        <div class="text-purple-200/50 italic">Сітка з'явиться після старту турніру.</div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div id="toast" class="toast"></div>
+
+<script>
+/* ============================================================
+   STATE
+============================================================ */
+const STORE_KEY = 'brawlArenaState_v1';
+let S = null;
+
+function freshState(){
+  return {
+    teams: [],          // loaded unique teams
+    pool: [],           // teams not yet drawn this round
+    winners: [],        // teams advancing to next round
+    roundName: '',
+    current: null,      // {a,b,tag,kind} kind: 'normal'|'third'|'final'
+    finalists: null,    // set after semifinal -> [t1,t2]
+    semiLosers: [],     // losers of semifinal -> 3rd place
+    thirdPlace: null,   // winner of 3rd place
+    fourthPlace: null,
+    runnerUp: null,
+    champion: null,
+    phase: 'setup',     // setup|round|thirdpending|third|finalpending|final|done
+    bracket: [],        // [{name,kind,matches:[{a,b,winner,bye}]}]
+  };
+}
+
+/* ============================================================
+   PARSING (text / csv)
+============================================================ */
+function parseTeams(raw){
+  if(!raw || !raw.trim()) return [];
+  const lines = raw.replace(/\r/g,'').split('\n').map(l=>l.trim()).filter(l=>l.length);
+  if(!lines.length) return [];
+
+  const delim = lines.some(l=>l.includes('\t')) ? '\t'
+              : lines.some(l=>l.includes(';')) ? ';'
+              : lines.some(l=>l.includes(',')) ? ',' : null;
+
+  const clean = c => c.replace(/^["']|["']$/g,'').trim();
+  let result = [];
+
+  if(delim){
+    const rows = lines.map(l=>l.split(delim).map(clean));
+    let headerIdx=-1, colIdx=-1;
+    for(let i=0;i<rows.length;i++){
+      const ci = rows[i].findIndex(c=>/назва\s*команди/i.test(c) || /team\s*name/i.test(c));
+      if(ci>=0){headerIdx=i;colIdx=ci;break;}
+    }
+    if(headerIdx>=0){
+      for(let i=headerIdx+1;i<rows.length;i++){
+        const v = rows[i][colIdx];
+        if(v) result.push(v);
+      }
+    } else {
+      result = rows.map(r=>r.find(c=>c.length)||'').filter(Boolean);
+    }
+  } else {
+    result = lines.map(clean);
+    if(result.length && (/назва\s*команди/i.test(result[0]) || /team\s*name/i.test(result[0]))){
+      result.shift();
+    }
+  }
+
+  result = result.filter(v=>v && !/^назва\s*команди$/i.test(v));
+  return dedupe(result);
+}
+
+let lastDupInfo = {renamed:0, names:[]};
+function dedupe(arr){
+  // keep every real team; if a name repeats, auto-number it so both still play
+  const counts=new Map(), out=[], renamed=[];
+  for(const raw of arr){
+    const name=String(raw).trim().replace(/\s+/g,' ');
+    if(!name) continue;
+    const k=name.toLowerCase();
+    const n=(counts.get(k)||0)+1;
+    counts.set(k,n);
+    if(n===1){ out.push(name); }
+    else { out.push(`${name} (${n})`); renamed.push(name); }
+  }
+  lastDupInfo = {renamed:renamed.length, names:[...new Set(renamed)]};
+  return out;
+}
+function dupMsg(){
+  if(!lastDupInfo.renamed) return '';
+  const list = lastDupInfo.names.slice(0,3).join(', ');
+  return ` · однакові назви пронумеровано: ${lastDupInfo.renamed} (${list}${lastDupInfo.names.length>3?'…':''})`;
+}
+
+/* ============================================================
+   PARSING (xlsx via SheetJS)
+============================================================ */
+function parseWorkbook(data){
+  const wb = XLSX.read(data, {type:'array'});
+  let best = [];
+  for(const sheetName of wb.SheetNames){
+    const sheet = wb.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(sheet, {header:1, blankrows:false, defval:''});
+    if(!rows.length) continue;
+    // find a column whose header matches "Назва команди"
+    let colIdx=-1, headerRow=-1;
+    for(let r=0;r<Math.min(rows.length,5);r++){
+      const ci = rows[r].findIndex(c=>/назва\s*команди/i.test(String(c)) || /team\s*name/i.test(String(c)));
+      if(ci>=0){colIdx=ci;headerRow=r;break;}
+    }
+    let teams=[];
+    if(colIdx>=0){
+      for(let r=headerRow+1;r<rows.length;r++){
+        const v = String(rows[r][colIdx]??'').trim();
+        if(v) teams.push(v);
+      }
+    } else {
+      // fallback: take first non-empty column's values (skip a header-ish first row)
+      for(let r=1;r<rows.length;r++){
+        const v = String((rows[r].find(c=>String(c).trim().length))??'').trim();
+        if(v) teams.push(v);
+      }
+    }
+    teams = dedupe(teams.filter(v=>v && !/^назва\s*команди$/i.test(v)));
+    if(teams.length>best.length) best=teams;
+  }
+  return best;
+}
+
+/* ============================================================
+   ROUND NAMING
+============================================================ */
+function roundLabel(size){
+  if(size>16) return '1/16 фіналу';
+  if(size>8)  return '1/8 фіналу';
+  if(size>4)  return 'Чвертьфінал';
+  if(size>2)  return 'Півфінал';
+  if(size===2)return 'Гранд-фінал';
+  return 'Фінал';
+}
+
+/* ============================================================
+   TOURNAMENT FLOW
+============================================================ */
+function startTournament(){
+  if(S.teams.length<2){toast('Потрібно щонайменше 2 команди');return;}
+  const t = freshState();
+  t.teams = S.teams.slice();
+  S = t;
+  S.pool = shuffle(S.teams.slice());
+  S.phase='round';
+  beginRound();
+  save();
+  switchTab('arena');
+  renderArena();
+  renderBracket();
+}
+
+function beginRound(){
+  S.roundName = roundLabel(S.pool.length);
+  S.winners = [];
+  S.current = null;
+  S.bracket.push({name:S.roundName, kind:'normal', matches:[]});
+  if(S.roundName==='Гранд-фінал') S.phase='final';
+}
+
+function currentBracketRound(){ return S.bracket[S.bracket.length-1]; }
+
+function drawMatch(){
+  if(S.pool.length===0){ return; }
+  if(S.pool.length===1){
+    const solo = S.pool.shift();
+    S.winners.push(solo);
+    currentBracketRound().matches.push({a:solo,b:'— (прохід)',winner:solo,bye:true});
+    toast(`${solo} проходить далі без матчу (bye)`);
+    if(S.pool.length===0){ roundComplete(); }
+    renderArena(); renderBracket(); save();
+    return;
+  }
+  const i = Math.floor(Math.random()*S.pool.length);
+  const a = S.pool.splice(i,1)[0];
+  const j = Math.floor(Math.random()*S.pool.length);
+  const b = S.pool.splice(j,1)[0];
+  S.current = {a,b,kind:'normal',tag:S.roundName};
+  save();
+  runShuffle(a,b,()=>showVersus());
+}
+
+function declareWinner(side){
+  if(!S.current) return;
+  const {a,b,kind} = S.current;
+  const winner = side==='a'?a:b;
+  const loser  = side==='a'?b:a;
+
+  if(kind==='final'){
+    S.champion = winner; S.runnerUp = loser; S.phase='done';
+    finalizeMatchBracket(winner);
+    animateWin(side, ()=>{ renderArena(); renderBracket(); save(); });
+    return;
+  }
+  if(kind==='third'){
+    S.thirdPlace = winner; S.fourthPlace = loser;
+    finalizeMatchBracket(winner);
+    S.phase='finalpending';
+    animateWin(side, ()=>{
+      toast(`🥉 ${winner} — 3-тє місце!`);
+      startFinal();
+    });
+    return;
+  }
+
+  S.winners.push(winner);
+  if(S.roundName==='Півфінал'){ S.semiLosers.push(loser); }
+  finalizeMatchBracket(winner);
+
+  animateWin(side, ()=>{
+    S.current=null;
+    document.getElementById('versusBox').classList.add('hidden');
+    if(S.pool.length===0){ roundComplete(); }
+    renderArena(); renderBracket(); save();
+  });
+}
+
+function finalizeMatchBracket(winner){
+  const r = S.bracket[S.bracket.length-1];
+  r.matches.push({a:S.current.a,b:S.current.b,winner});
+}
+
+function roundComplete(){
+  if(S.roundName==='Півфінал'){
+    S.finalists = S.winners.slice();
+    if(S.semiLosers.length>=2){
+      S.phase='thirdpending';
+      toast('Півфінали завершено! Спочатку — матч за 3-тє місце.');
+    } else {
+      startFinal();
+    }
+  } else if(S.roundName==='Гранд-фінал'){
+    // handled in declareWinner(final)
+  } else {
+    if(S.winners.length===1){
+      S.champion = S.winners[0]; S.phase='done';
+      toast('Турнір завершено!');
+    } else {
+      S.pool = shuffle(S.winners.slice());
+      beginRound();
+    }
+  }
+  save();
+}
+
+function startThirdPlace(){
+  S.phase='third';
+  S.bracket.push({name:'Матч за 3-тє місце', kind:'third', matches:[]});
+  const [a,b] = S.semiLosers;
+  S.current = {a,b,kind:'third',tag:'🥉 МАТЧ ЗА 3-ТЄ МІСЦЕ'};
+  S.roundName='Матч за 3-тє місце';
+  save();
+  runShuffle(a,b,()=>showVersus());
+}
+
+function startFinal(){
+  S.phase='final';
+  S.bracket.push({name:'Гранд-фінал', kind:'final', matches:[]});
+  const [a,b] = S.finalists;
+  S.current = {a,b,kind:'final',tag:'🏆 ГРАНД-ФІНАЛ'};
+  S.roundName='Гранд-фінал';
+  save();
+  runShuffle(a,b,()=>showVersus());
+}
+
+function proceed(){
+  if(S.phase==='thirdpending'){ startThirdPlace(); renderArena(); return; }
+  renderArena();
+}
+
+/* ============================================================
+   ANIMATIONS
+============================================================ */
+function shuffle(arr){
+  for(let i=arr.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+  return arr;
+}
+
+function runShuffle(finalA, finalB, done){
+  const box=document.getElementById('shuffleBox');
+  const versus=document.getElementById('versusBox');
+  const champ=document.getElementById('championBox');
+  const reelA=document.getElementById('reelA'), reelB=document.getElementById('reelB');
+  versus.classList.add('hidden'); champ.classList.add('hidden');
+  document.getElementById('drawBtn').classList.add('hidden');
+  document.getElementById('nextRoundBtn').classList.add('hidden');
+  box.classList.remove('hidden');
+  reelA.classList.add('spin'); reelB.classList.add('spin');
+
+  const names = S.teams.length?S.teams:[finalA,finalB];
+  let elapsed=0; const dur=1700; let interval=55;
+  function tick(){
+    reelA.innerHTML='<span class="item">'+escapeHtml(rand(names))+'</span>';
+    reelB.innerHTML='<span class="item">'+escapeHtml(rand(names))+'</span>';
+    elapsed+=interval;
+    interval = Math.min(220, interval*1.07);
+    if(elapsed<dur){ setTimeout(tick, interval); }
+    else{
+      reelA.classList.remove('spin'); reelB.classList.remove('spin');
+      reelA.innerHTML='<span class="item neon-text">'+escapeHtml(finalA)+'</span>';
+      reelB.innerHTML='<span class="item neon-text">'+escapeHtml(finalB)+'</span>';
+      setTimeout(()=>{ box.classList.add('hidden'); done&&done(); }, 650);
+    }
+  }
+  tick();
+  function rand(a){return a[Math.floor(Math.random()*a.length)];}
+}
+
+function showVersus(){
+  const v=document.getElementById('versusBox');
+  v.classList.remove('hidden');
+  v.classList.remove('fade-in'); void v.offsetWidth; v.classList.add('fade-in');
+  const cA=document.getElementById('cardA'), cB=document.getElementById('cardB');
+  cA.classList.remove('winner','loser'); cB.classList.remove('winner','loser');
+  cA.querySelector('.team-name').textContent=S.current.a;
+  cB.querySelector('.team-name').textContent=S.current.b;
+  cA.querySelector('.win-tag').classList.add('hidden');
+  cB.querySelector('.win-tag').classList.add('hidden');
+  document.getElementById('matchTag').textContent = S.current.tag||'';
+  document.getElementById('drawBtn').classList.add('hidden');
+  document.getElementById('nextRoundBtn').classList.add('hidden');
+}
+
+function animateWin(side, after){
+  const cA=document.getElementById('cardA'), cB=document.getElementById('cardB');
+  const win = side==='a'?cA:cB, lose = side==='a'?cB:cA;
+  win.classList.add('winner'); lose.classList.add('loser');
+  win.querySelector('.win-tag').classList.remove('hidden');
+  setTimeout(()=>{ after&&after(); }, 1300);
+}
+
+/* ============================================================
+   RENDER
+============================================================ */
+function renderSetup(){
+  const list=document.getElementById('teamList');
+  document.getElementById('teamCount').textContent='('+S.teams.length+')';
+  document.getElementById('startBtn').disabled = S.teams.length<2;
+  if(!S.teams.length){
+    list.innerHTML='<span class="text-purple-300/50 italic">Команди з\'являться тут після аналізу...</span>';
+    return;
+  }
+  list.innerHTML = S.teams.map((t,i)=>
+    `<span class="chip pop-in" style="animation-delay:${Math.min(i*25,500)}ms"><span class="text-cyan-300 text-xs">${String(i+1).padStart(2,'0')}</span> ${escapeHtml(t)}</span>`
+  ).join('');
+}
+
+function renderArena(){
+  const started = S.phase!=='setup';
+  document.getElementById('arenaEmpty').classList.toggle('hidden', started);
+  if(!started) return;
+
+  document.getElementById('roundName').textContent = S.roundName||'—';
+  document.getElementById('poolLeft').textContent = S.pool.length;
+  document.getElementById('advCount').textContent = S.winners.length;
+
+  const drawBtn=document.getElementById('drawBtn');
+  const nextBtn=document.getElementById('nextRoundBtn');
+  const versus=document.getElementById('versusBox');
+  const champ=document.getElementById('championBox');
+  const shuffleBox=document.getElementById('shuffleBox');
+
+  champ.classList.add('hidden');
+
+  if(S.phase==='done'){
+    versus.classList.add('hidden'); drawBtn.classList.add('hidden'); nextBtn.classList.add('hidden');
+    shuffleBox.classList.add('hidden');
+    renderChampion();
+    return;
+  }
+
+  if(S.phase==='thirdpending'){
+    drawBtn.classList.add('hidden');
+    nextBtn.classList.remove('hidden');
+    nextBtn.textContent='🥉 До матчу за 3-тє місце';
+    return;
+  }
+
+  if(S.current){
+    drawBtn.classList.add('hidden'); nextBtn.classList.add('hidden');
+    return;
+  }
+
+  versus.classList.add('hidden');
+  if(S.pool.length>0){
+    drawBtn.classList.remove('hidden');
+    nextBtn.classList.add('hidden');
+    drawBtn.textContent = S.pool.length===1 ? '🎟 Прохід останньої команди' : '🎰 Випадковий вибір матчу';
+  } else {
+    drawBtn.classList.add('hidden');
+    nextBtn.classList.add('hidden');
+  }
+}
+
+function renderChampion(){
+  const c=document.getElementById('championBox');
+  c.classList.remove('hidden');
+  document.getElementById('championName').textContent = S.champion||'—';
+  const podium=document.getElementById('podium');
+  const rows=[
+    ['🥈','2-ге місце',S.runnerUp,'var(--blue)'],
+    ['🥉','3-тє місце',S.thirdPlace,'#ff9c2b'],
+    ['4️⃣','4-те місце',S.fourthPlace,'#c79bff'],
+  ].filter(r=>r[2]);
+  podium.innerHTML = rows.map(r=>
+    `<div class="glass p-4 px-6 pop-in"><div class="text-3xl">${r[0]}</div>
+     <div class="text-xs tracking-widest display mt-1" style="color:${r[3]}">${r[1]}</div>
+     <div class="display font-bold mt-1">${escapeHtml(r[2])}</div></div>`
+  ).join('');
+}
+
+function matchBox(m, extraCls){
+  const aWin = m.winner===m.a, bWin=m.winner && m.winner===m.b;
+  const slot=(name,win)=>{
+    if(!name) return `<div class="slot tbd">очікування…</div>`;
+    const cls = m.winner ? (win?'win':'lose') : '';
+    return `<div class="slot ${cls}" title="${escapeHtml(name)}">${escapeHtml(name)}</div>`;
+  };
+  return `<div class="match-box ${extraCls||''} pop-in">${slot(m.a,aWin)}${slot(m.b,bWin)}</div>`;
+}
+
+function renderBracket(){
+  const wrap=document.getElementById('bracketWrap');
+  if(!S.bracket.length){
+    wrap.innerHTML='<div class="text-purple-200/50 italic">Сітка з\'явиться після старту турніру.</div>';
+    return;
+  }
+
+  const normal = S.bracket.filter(r=>r.kind==='normal');
+  const finalR = S.bracket.find(r=>r.kind==='final');
+  const thirdR = S.bracket.find(r=>r.kind==='third');
+
+  // build left & right halves for each normal round
+  const leftCols=[], rightCols=[];
+  normal.forEach(r=>{
+    const mid = Math.ceil(r.matches.length/2);
+    const left = r.matches.slice(0,mid);
+    const right = r.matches.slice(mid);
+    const colHTML = (matches)=>`<div class="round-col">
+        <div class="round-head">${escapeHtml(r.name)}</div>
+        ${matches.length?matches.map(m=>matchBox(m)).join(''):'<div class="text-purple-300/30 text-xs italic text-center">—</div>'}
+      </div>`;
+    leftCols.push(colHTML(left));
+    rightCols.push(colHTML(right));
+  });
+
+  // centre column: final (top) + third place (below)
+  let center='';
+  const finalMatch = finalR && finalR.matches[0];
+  center += `<div class="center-crown">👑</div>`;
+  center += `<div class="center-label">Гранд-фінал</div>`;
+  center += finalMatch ? matchBox(finalMatch,'final-box')
+    : `<div class="match-box final-box"><div class="slot tbd">фіналіст 1</div><div class="slot tbd">фіналіст 2</div></div>`;
+  if(thirdR || (S.phase!=='setup' && normal.some(r=>r.name==='Півфінал'))){
+    const tMatch = thirdR && thirdR.matches[0];
+    center += `<div class="center-label" style="margin-top:1rem;color:#ffb066">🥉 Матч за 3-тє місце</div>`;
+    center += tMatch ? matchBox(tMatch,'third-box')
+      : (S.semiLosers && S.semiLosers.length
+          ? matchBox({a:S.semiLosers[0],b:S.semiLosers[1]||null,winner:null},'third-box')
+          : `<div class="match-box third-box"><div class="slot tbd">програвець ½</div><div class="slot tbd">програвець ½</div></div>`);
+  }
+
+  wrap.innerHTML =
+    `<div class="bracket-side">${leftCols.join('')}</div>`+
+    `<div class="center-col">${center}</div>`+
+    `<div class="bracket-side">${rightCols.slice().reverse().join('')}</div>`;
+}
+
+/* ============================================================
+   PERSISTENCE
+============================================================ */
+function save(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(S)); }catch(e){} }
+function load(){
+  try{
+    const raw=localStorage.getItem(STORE_KEY);
+    if(raw){ S=JSON.parse(raw); return true; }
+  }catch(e){}
+  return false;
+}
+
+function exportProgress(){
+  const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='brawl-arena-progress.json'; a.click();
+  URL.revokeObjectURL(url);
+  toast('Прогрес експортовано');
+}
+
+function importProgress(file){
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      const obj=JSON.parse(e.target.result);
+      if(!obj || !Array.isArray(obj.teams)) throw 0;
+      S=Object.assign(freshState(),obj);
+      save(); fullRender();
+      switchTab(S.phase==='setup'?'setup':'arena');
+      toast('Прогрес імпортовано');
+    }catch{ toast('Некоректний файл'); }
+  };
+  r.readAsText(file);
+}
+
+function resetTournament(){
+  if(!confirm('Скинути турнір? Весь прогрес буде втрачено.')) return;
+  const keepTeams = S.teams.slice();
+  S=freshState();
+  S.teams=keepTeams;
+  save(); fullRender(); switchTab('setup');
+  toast('Турнір скинуто');
+}
+
+/* ============================================================
+   FILE LOADING (xlsx + text)
+============================================================ */
+function handleFile(f){
+  const name=(f.name||'').toLowerCase();
+  const isExcel = /\.(xlsx|xls)$/.test(name);
+  const r=new FileReader();
+  r.onload=ev=>{
+    let teams=[];
+    try{
+      if(isExcel){
+        if(typeof XLSX==='undefined'){ toast('Бібліотека Excel не завантажилась (потрібен інтернет)'); return; }
+        teams = parseWorkbook(new Uint8Array(ev.target.result));
+        document.getElementById('dataInput').value = 'Назва команди\n'+teams.join('\n');
+      } else {
+        document.getElementById('dataInput').value = ev.target.result;
+        teams = parseTeams(ev.target.result);
+      }
+    }catch(e){ toast('Не вдалося прочитати файл'); return; }
+    if(!teams.length){ toast('Команд не знайдено у файлі'); return; }
+    S.teams=teams; save(); renderSetup();
+    toast(`Завантажено ${teams.length} команд із файлу`+dupMsg());
+  };
+  if(isExcel) r.readAsArrayBuffer(f); else r.readAsText(f);
+}
+
+/* ============================================================
+   UI WIRING
+============================================================ */
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
+  document.getElementById('tab-setup').classList.toggle('hidden',name!=='setup');
+  document.getElementById('tab-arena').classList.toggle('hidden',name!=='arena');
+  document.getElementById('tab-bracket').classList.toggle('hidden',name!=='bracket');
+  if(name==='bracket') renderBracket();
+  if(name==='arena') renderArena();
+}
+
+function fullRender(){ renderSetup(); renderArena(); renderBracket(); }
+
+let toastTimer;
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),2600);
+}
+
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  if(!load()) S=freshState();
+
+  document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>switchTab(t.dataset.tab)));
+
+  document.getElementById('parseBtn').addEventListener('click',()=>{
+    const teams=parseTeams(document.getElementById('dataInput').value);
+    if(!teams.length){toast('Команд не знайдено');return;}
+    S.teams=teams; S.phase='setup'; save(); renderSetup();
+    toast(`Завантажено ${teams.length} команд`+dupMsg());
+  });
+  document.getElementById('fileInput').addEventListener('change',e=>{ if(e.target.files[0]) handleFile(e.target.files[0]); e.target.value=''; });
+  document.getElementById('loadDemo').addEventListener('click',()=>{
+    const demo=['Phoenix Squad','Neon Wolves','Cyber Kings','Toxic Shells','Star Raiders','Void Hunters','Pixel Storm','Mega Crew','Shelly Force','Bull Riders','Crow Nation','Spike Squad','Leon Legends','Nita Pack','Colt Shooters','Poco Beats'];
+    document.getElementById('dataInput').value='Назва команди\n'+demo.join('\n');
+    S.teams=demo; save(); renderSetup(); toast('Демо-команди завантажено');
+  });
+
+  document.getElementById('startBtn').addEventListener('click',startTournament);
+  document.getElementById('drawBtn').addEventListener('click',drawMatch);
+  document.getElementById('nextRoundBtn').addEventListener('click',proceed);
+
+  document.getElementById('cardA').addEventListener('click',()=>declareWinner('a'));
+  document.getElementById('cardB').addEventListener('click',()=>declareWinner('b'));
+
+  document.getElementById('exportBtn').addEventListener('click',exportProgress);
+  document.getElementById('importInput').addEventListener('change',e=>{ if(e.target.files[0]) importProgress(e.target.files[0]); });
+  document.getElementById('resetBtn').addEventListener('click',resetTournament);
+
+  fullRender();
+  if(S.phase!=='setup' && S.phase!=='done') switchTab('arena');
+  if(S.current){ showVersus(); }
+});
+</script>
+</body>
+</html>
