@@ -21,6 +21,16 @@
   }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%}
+
+  /* ---- large-screen / stream scaling ----
+     Tailwind spacing & font utilities are rem-based, so bumping the root
+     font-size proportionally enlarges (almost) the whole UI. This is what
+     makes the layout readable when captured at 2K/4K (e.g. via OBS). */
+  html{font-size:16px}
+  @media (min-width:1500px){ html{font-size:17px} }
+  @media (min-width:1900px){ html{font-size:20px} }
+  @media (min-width:2500px){ html{font-size:26px} }
+  @media (min-width:3700px){ html{font-size:34px} }
   body{
     font-family:'Rajdhani',sans-serif;
     color:#e9e2ff;
@@ -106,7 +116,7 @@
   /* VS cards */
   .vs-card{
     cursor:pointer;border-radius:26px;padding:2.6rem 1.6rem;text-align:center;position:relative;
-    min-height:260px;display:flex;align-items:center;justify-content:center;
+    min-height:16.25rem;display:flex;align-items:center;justify-content:center;
     transition:transform .25s ease, box-shadow .3s ease, border-color .3s;
     border:2px solid var(--glass-border);overflow:hidden;
     background:linear-gradient(160deg,rgba(124,43,240,.18),rgba(10,2,30,.6));
@@ -115,7 +125,7 @@
   .vs-card .label{position:relative;z-index:2;width:100%}
   /* team name auto-scales to fit but never overflows */
   .team-name{font-size:clamp(1.2rem,2.8vw,2.4rem)}
-  @media(min-width:768px){.vs-card{min-height:300px}}
+  @media(min-width:768px){.vs-card{min-height:18.75rem}}
   .vs-card::after{content:"";position:absolute;inset:0;opacity:0;transition:opacity .3s;
     background:radial-gradient(circle at 50% 0%,rgba(255,224,0,.25),transparent 60%)}
   .vs-card:hover{transform:translateY(-8px) scale(1.04);border-color:var(--yellow);
@@ -139,7 +149,7 @@
   @keyframes vsthrob{0%,100%{transform:scale(1) rotate(-3deg)}50%{transform:scale(1.15) rotate(3deg)}}
 
   /* reels / shuffle overlay */
-  .reel{height:90px;overflow:hidden;border-radius:14px;border:1px solid var(--glass-border);
+  .reel{height:5.6rem;overflow:hidden;border-radius:14px;border:1px solid var(--glass-border);
     display:flex;align-items:center;justify-content:center;font-family:'Orbitron';font-weight:700;
     font-size:1.4rem;background:rgba(10,2,30,.7)}
   .reel.spin{animation:reelglow .25s linear infinite}
@@ -156,8 +166,8 @@
   .bracket-wrap{display:flex;align-items:stretch;justify-content:center;gap:.9rem;
     overflow-x:auto;padding:1rem .2rem 1.6rem}
   .bracket-side{display:flex;gap:.9rem}
-  .round-col{min-width:150px;display:flex;flex-direction:column;justify-content:center;gap:.8rem;flex:0 0 auto}
-  .center-col{min-width:190px;display:flex;flex-direction:column;justify-content:center;gap:1.2rem;flex:0 0 auto}
+  .round-col{min-width:9.4rem;display:flex;flex-direction:column;justify-content:center;gap:.8rem;flex:0 0 auto}
+  .center-col{min-width:11.9rem;display:flex;flex-direction:column;justify-content:center;gap:1.2rem;flex:0 0 auto}
   .round-head{font-family:'Orbitron';font-weight:700;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;
     text-align:center;color:#cbb8ff;padding-bottom:.35rem;border-bottom:1px solid var(--glass-border);margin-bottom:.2rem}
   .match-box{border:1px solid var(--glass-border);border-radius:11px;overflow:hidden;
@@ -268,6 +278,13 @@
       <button id="nextRoundBtn" class="btn btn-blue text-lg px-8 py-4 hidden">➡ Наступний раунд</button>
     </div>
 
+    <!-- manual bye (odd number of teams) -->
+    <div id="byeBox" class="glass p-6 hidden fade-in">
+      <div class="text-center display neon-text tracking-[0.25em] mb-2 text-sm">НЕПАРНА КІЛЬКІСТЬ КОМАНД</div>
+      <p class="text-center text-purple-200/70 text-sm mb-5">У цьому раунді непарна кількість команд. Оберіть вручну, хто проходить далі <span class="neon-yellow">без бою</span> (за рівнем у ранкеді).</p>
+      <div id="byeOptions" class="flex flex-wrap justify-center gap-3"></div>
+    </div>
+
     <!-- shuffle overlay -->
     <div id="shuffleBox" class="glass p-6 hidden">
       <div class="text-center display neon-text tracking-[0.3em] mb-4 text-sm">ЖЕРЕБКУВАННЯ...</div>
@@ -342,6 +359,7 @@ function freshState(){
     pool: [],           // teams not yet drawn this round
     winners: [],        // teams advancing to next round
     roundName: '',
+    roundNumber: 0,     // 1-based; only round 1 uses random draw, later rounds follow bracket position
     current: null,      // {a,b,tag,kind} kind: 'normal'|'third'|'final'
     finalists: null,    // set after semifinal -> [t1,t2]
     semiLosers: [],     // losers of semifinal -> 3rd place
@@ -349,7 +367,7 @@ function freshState(){
     fourthPlace: null,
     runnerUp: null,
     champion: null,
-    phase: 'setup',     // setup|round|thirdpending|third|finalpending|final|done
+    phase: 'setup',     // setup|round|byepending|thirdpending|third|finalpending|final|done
     bracket: [],        // [{name,kind,matches:[{a,b,winner,bye}]}]
   };
 }
@@ -472,8 +490,11 @@ function startTournament(){
   const t = freshState();
   t.teams = S.teams.slice();
   S = t;
+  // the ONLY randomness in the tournament: it sets the round-1 draw order,
+  // which in turn fixes every team's position in the bracket.
   S.pool = shuffle(S.teams.slice());
   S.phase='round';
+  S.roundNumber=0;
   beginRound();
   save();
   switchTab('arena');
@@ -482,33 +503,67 @@ function startTournament(){
 }
 
 function beginRound(){
-  S.roundName = roundLabel(S.pool.length);
+  S.roundNumber=(S.roundNumber||0)+1;
   S.winners = [];
   S.current = null;
+  // exactly two teams left -> jump straight to the grand final
+  if(S.pool.length===2){
+    S.finalists = S.pool.slice();
+    S.pool=[];
+    startFinal();
+    return;
+  }
+  S.roundName = roundLabel(S.pool.length);
   S.bracket.push({name:S.roundName, kind:'normal', matches:[]});
-  if(S.roundName==='Гранд-фінал') S.phase='final';
+  // odd number of teams -> organizers manually pick who advances (by ranked level)
+  if(S.pool.length % 2 === 1){ S.phase='byepending'; }
 }
 
 function currentBracketRound(){ return S.bracket[S.bracket.length-1]; }
 
 function drawMatch(){
+  if(S.phase==='byepending'){ return; } // a bye must be chosen first (handled by its own UI)
   if(S.pool.length===0){ return; }
   if(S.pool.length===1){
-    const solo = S.pool.shift();
-    S.winners.push(solo);
-    currentBracketRound().matches.push({a:solo,b:'— (прохід)',winner:solo,bye:true});
-    toast(`${solo} проходить далі без матчу (bye)`);
-    if(S.pool.length===0){ roundComplete(); }
-    renderArena(); renderBracket(); save();
+    // safety net: an odd team is left over -> fall back to manual bye selection
+    S.phase='byepending';
+    renderArena(); save();
     return;
   }
-  const i = Math.floor(Math.random()*S.pool.length);
-  const a = S.pool.splice(i,1)[0];
-  const j = Math.floor(Math.random()*S.pool.length);
-  const b = S.pool.splice(j,1)[0];
-  S.current = {a,b,kind:'normal',tag:S.roundName};
-  save();
-  runShuffle(a,b,()=>showVersus());
+
+  let a,b;
+  if(S.roundNumber===1){
+    // ROUND 1 — random draw with the slot-machine reels. This is the only
+    // round where the pairing is random; it seeds the whole bracket.
+    const i = Math.floor(Math.random()*S.pool.length);
+    a = S.pool.splice(i,1)[0];
+    const j = Math.floor(Math.random()*S.pool.length);
+    b = S.pool.splice(j,1)[0];
+    S.current = {a,b,kind:'normal',tag:S.roundName};
+    save();
+    runShuffle(a,b,()=>showVersus());
+  } else {
+    // LATER ROUNDS — pairing follows the bracket position, no randomness.
+    // The pool keeps the winners in bracket order, so the next two in line meet.
+    a = S.pool.shift();
+    b = S.pool.shift();
+    S.current = {a,b,kind:'normal',tag:S.roundName};
+    save();
+    showVersus();
+  }
+}
+
+// odd round -> the organizers manually advance one team without a match
+function chooseBye(idx){
+  if(S.phase!=='byepending') return;
+  if(idx<0 || idx>=S.pool.length) return;
+  const team = S.pool.splice(idx,1)[0];
+  S.winners.push(team);
+  currentBracketRound().matches.push({a:team,b:'— (прохід)',winner:team,bye:true});
+  S.phase='round';
+  toast(`${team} проходить далі без бою (обрано вручну)`);
+  if(S.pool.length===0){ roundComplete(); }
+  renderArena(); renderBracket(); save();
 }
 
 function declareWinner(side){
@@ -567,7 +622,9 @@ function roundComplete(){
       S.champion = S.winners[0]; S.phase='done';
       toast('Турнір завершено!');
     } else {
-      S.pool = shuffle(S.winners.slice());
+      // keep winners in bracket order (NO reshuffle) — next-round pairings
+      // follow the positions established by the round-1 draw.
+      S.pool = S.winners.slice();
       beginRound();
     }
   }
@@ -581,7 +638,7 @@ function startThirdPlace(){
   S.current = {a,b,kind:'third',tag:'🥉 МАТЧ ЗА 3-ТЄ МІСЦЕ'};
   S.roundName='Матч за 3-тє місце';
   save();
-  runShuffle(a,b,()=>showVersus());
+  showVersus(); // fixed pairing — reveal directly, no random reels
 }
 
 function startFinal(){
@@ -591,7 +648,7 @@ function startFinal(){
   S.current = {a,b,kind:'final',tag:'🏆 ГРАНД-ФІНАЛ'};
   S.roundName='Гранд-фінал';
   save();
-  runShuffle(a,b,()=>showVersus());
+  showVersus(); // fixed pairing — reveal directly, no random reels
 }
 
 function proceed(){
@@ -693,13 +750,23 @@ function renderArena(){
   const versus=document.getElementById('versusBox');
   const champ=document.getElementById('championBox');
   const shuffleBox=document.getElementById('shuffleBox');
+  const byeBox=document.getElementById('byeBox');
 
   champ.classList.add('hidden');
+  byeBox.classList.add('hidden');
 
   if(S.phase==='done'){
     versus.classList.add('hidden'); drawBtn.classList.add('hidden'); nextBtn.classList.add('hidden');
     shuffleBox.classList.add('hidden');
     renderChampion();
+    return;
+  }
+
+  if(S.phase==='byepending'){
+    drawBtn.classList.add('hidden'); nextBtn.classList.add('hidden');
+    versus.classList.add('hidden'); shuffleBox.classList.add('hidden');
+    byeBox.classList.remove('hidden');
+    renderByeOptions();
     return;
   }
 
@@ -719,11 +786,23 @@ function renderArena(){
   if(S.pool.length>0){
     drawBtn.classList.remove('hidden');
     nextBtn.classList.add('hidden');
-    drawBtn.textContent = S.pool.length===1 ? '🎟 Прохід останньої команди' : '🎰 Випадковий вибір матчу';
+    drawBtn.textContent = S.roundNumber===1
+      ? '🎰 Випадковий вибір матчу'
+      : '⚔ Наступний матч';
   } else {
     drawBtn.classList.add('hidden');
     nextBtn.classList.add('hidden');
   }
+}
+
+function renderByeOptions(){
+  const box=document.getElementById('byeOptions');
+  box.innerHTML = S.pool.map((t,i)=>
+    `<button class="btn btn-ghost bye-pick" data-i="${i}">${escapeHtml(t)}</button>`
+  ).join('');
+  box.querySelectorAll('.bye-pick').forEach(b=>
+    b.addEventListener('click',()=>chooseBye(parseInt(b.dataset.i,10)))
+  );
 }
 
 function renderChampion(){
@@ -804,10 +883,19 @@ function renderBracket(){
    PERSISTENCE
 ============================================================ */
 function save(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(S)); }catch(e){} }
+function migrate(state){
+  // older saves predate roundNumber — derive it from how many normal rounds exist
+  if(typeof state.roundNumber!=='number'){
+    state.roundNumber = Array.isArray(state.bracket)
+      ? state.bracket.filter(r=>r.kind==='normal').length || (state.phase!=='setup'?1:0)
+      : 0;
+  }
+  return state;
+}
 function load(){
   try{
     const raw=localStorage.getItem(STORE_KEY);
-    if(raw){ S=JSON.parse(raw); return true; }
+    if(raw){ S=migrate(JSON.parse(raw)); return true; }
   }catch(e){}
   return false;
 }
@@ -827,7 +915,7 @@ function importProgress(file){
     try{
       const obj=JSON.parse(e.target.result);
       if(!obj || !Array.isArray(obj.teams)) throw 0;
-      S=Object.assign(freshState(),obj);
+      S=migrate(Object.assign(freshState(),obj));
       save(); fullRender();
       switchTab(S.phase==='setup'?'setup':'arena');
       toast('Прогрес імпортовано');
