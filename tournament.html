@@ -121,6 +121,7 @@
     border:2px solid var(--glass-border);overflow:hidden;
     background:linear-gradient(160deg,rgba(124,43,240,.18),rgba(10,2,30,.6));
     backdrop-filter:blur(14px);
+    user-select:none;-webkit-user-select:none;caret-color:transparent;-webkit-tap-highlight-color:transparent;
   }
   .vs-card .label{position:relative;z-index:2;width:100%}
   /* team name auto-scales to fit but never overflows */
@@ -163,8 +164,14 @@
   @keyframes popin{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:scale(1)}}
 
   /* bracket — two-sided, converging to centre */
-  .bracket-wrap{display:flex;align-items:stretch;justify-content:center;gap:.9rem;
-    overflow-x:auto;padding:1rem .2rem 1.6rem}
+  /* the bracket tab breaks out of the centred max-width column so the sitka
+     can spread to the very edges of the screen */
+  #tab-bracket{position:relative;left:50%;right:50%;width:100vw;margin-left:-50vw;margin-right:-50vw;padding:0 1.2rem}
+  .bracket-wrap{overflow:hidden;padding:1rem .2rem 1.6rem}
+  /* the inner flex holds its natural width; JS scales it down to fit the
+     available width (floor-limited) so the sides are never hidden/cut off */
+  .bracket-inner{display:inline-flex;align-items:stretch;justify-content:center;gap:.9rem;
+    transform-origin:top left;transition:transform .2s ease}
   .bracket-side{display:flex;gap:.9rem}
   .round-col{min-width:9.4rem;display:flex;flex-direction:column;justify-content:center;gap:.8rem;flex:0 0 auto}
   .center-col{min-width:11.9rem;display:flex;flex-direction:column;justify-content:center;gap:1.2rem;flex:0 0 auto}
@@ -874,9 +881,39 @@ function renderBracket(){
   }
 
   wrap.innerHTML =
-    `<div class="bracket-side">${leftCols.join('')}</div>`+
-    `<div class="center-col">${center}</div>`+
-    `<div class="bracket-side">${rightCols.slice().reverse().join('')}</div>`;
+    `<div id="bracketInner" class="bracket-inner">`+
+      `<div class="bracket-side">${leftCols.join('')}</div>`+
+      `<div class="center-col">${center}</div>`+
+      `<div class="bracket-side">${rightCols.slice().reverse().join('')}</div>`+
+    `</div>`;
+  fitBracket();
+}
+
+/* Scale the bracket to fit the available width. It spreads to the screen
+   edges and shrinks (down to a readable floor) so the whole sitka stays
+   visible at once — no scrolling needed. */
+function fitBracket(){
+  const wrap=document.getElementById('bracketWrap');
+  const inner=document.getElementById('bracketInner');
+  if(!wrap||!inner) return;
+  // reset transforms so we measure the natural size
+  inner.style.transform='none';
+  inner.style.marginLeft='0';
+  inner.style.marginBottom='0';
+  const natW=inner.scrollWidth;
+  const natH=inner.offsetHeight;
+  const avail=wrap.clientWidth;
+  if(!natW||!avail) return;
+  const FLOOR=0.4;                       // never shrink below 40% (stays legible)
+  let scale=avail/natW;
+  if(scale>1) scale=1;
+  if(scale<FLOOR) scale=FLOOR;
+  inner.style.transform=`scale(${scale})`;
+  const scaledW=natW*scale;
+  // centre the bracket within the available width
+  inner.style.marginLeft=Math.max(0,(avail-scaledW)/2)+'px';
+  // reclaim the vertical space the transform left behind
+  inner.style.marginBottom=(natH*scale-natH)+'px';
 }
 
 /* ============================================================
@@ -1015,6 +1052,13 @@ document.addEventListener('DOMContentLoaded',()=>{
   fullRender();
   if(S.phase!=='setup' && S.phase!=='done') switchTab('arena');
   if(S.current){ showVersus(); }
+
+  // keep the bracket fitted to the viewport on resize / zoom
+  let fitTimer;
+  window.addEventListener('resize',()=>{
+    clearTimeout(fitTimer);
+    fitTimer=setTimeout(fitBracket,120);
+  });
 });
 </script>
 </body>
